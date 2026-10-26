@@ -1,5 +1,6 @@
-import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey } from "../db/survey.js";
+import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey, updateSurveyStatus} from "../db/survey.js";
 import { generateSlug } from "../utils/slug.js";
+import { surveyStatusSchema } from "../utils/validator.js";
 
 export async function createSurveyController(req, res) {
   const {
@@ -136,6 +137,34 @@ export async function removeSurvey(req, res) {
     return res.json({ message: "Survey deleted successfully" });
   } catch (error) {
     console.error("Delete survey error:", error.message);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+// update survey status 
+export async function changeSurveyStatus(req, res) {
+  try {
+    const { status } = surveyStatusSchema.parse(req.body);
+    const survey = await updateSurveyStatus(
+      req.params.id,
+      req.user.userId,
+      status
+    );
+
+    if (!survey) {
+      return res.status(404).json({ message: "Survey not found" });
+    }
+
+    return res.json({
+      message: `Survey ${status.toLowerCase()} successfully`,
+      survey,
+    });
+  } catch (error) {
+    if (error.name === "ZodError") {
+      return res.status(400).json({ errors: error.issues });
+    }
+
+    console.error("Change survey status error:", error.message);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

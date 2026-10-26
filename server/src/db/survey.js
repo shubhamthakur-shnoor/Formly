@@ -80,3 +80,15 @@ export async function deleteSurvey(surveyId, userId) {
 
   return rows[0] || null;
 }
+
+export async function updateSurveyStatus(surveyId, userId, status) {
+  const { rows } = await pool.query(
+    `UPDATE surveys
+     SET status = $1, updated_at = NOW()
+     WHERE survey_id = $2 AND user_id = $3
+     RETURNING *`,
+    [status, surveyId, userId]
+  );
+
+  return rows[0] || null;
+}

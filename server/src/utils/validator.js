@@ -45,3 +45,6 @@ export const questionSchema = z.object({
   }
 });
 
+export const surveyStatusSchema = z.object({
+  status: z.enum(["PUBLISHED", "CLOSED"]),
+});
