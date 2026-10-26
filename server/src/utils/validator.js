@@ -48,3 +48,17 @@ export const questionSchema = z.object({
 export const surveyStatusSchema = z.object({
   status: z.enum(["PUBLISHED", "CLOSED"]),
 });
+
+export const submitResponseSchema = z.object({
+  respondent_name: z.string().trim().min(1).max(100).optional(),
+  respondent_email: z.string().trim().email().max(255).optional(),
+  respondent_token: z.string().trim().min(16).max(200).optional(),
+  answers: z.array(
+    z.object({
+      question_id: z.coerce.number().int().positive(),
+      selected_option_id: z.coerce.number().int().positive().optional(),
+      rating_score: z.coerce.number().int().min(1).max(5).optional(),
+      text_answer: z.string().trim().max(10000).optional(),
+    })
+  ).min(1),
+});

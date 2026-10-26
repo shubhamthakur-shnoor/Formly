@@ -53,6 +53,7 @@ CREATE TABLE responses (
     survey_id BIGINT NOT NULL REFERENCES surveys(survey_id) ON DELETE CASCADE,
     respondent_name VARCHAR(100),
     respondent_email VARCHAR(255),
+    respondent_token TEXT,
     submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
