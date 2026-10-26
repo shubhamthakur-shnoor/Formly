@@ -92,3 +92,25 @@ export async function updateSurveyStatus(surveyId, userId, status) {
 
   return rows[0] || null;
 }
+
+export async function getPublishedSurveyBySlug(slug) {
+  const { rows } = await pool.query(
+    `SELECT
+       survey_id,
+       title,
+       slug,
+       description,
+       is_anonymous,
+       start_at,
+       end_at,
+       status
+     FROM surveys
+     WHERE slug = $1
+       AND status = 'PUBLISHED'
+       AND (start_at IS NULL OR start_at <= NOW())
+       AND (end_at IS NULL OR end_at > NOW())`,
+    [slug]
+  );
+
+  return rows[0] || null;
+}
