@@ -1,6 +1,7 @@
 import express from "express";
 import "dotenv/config";
 import authRoutes from "./routes/authRoutes.js";
+import surveyRoutes from "./routes/survey.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.get("/", function (req, res) {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/surveys", surveyRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
