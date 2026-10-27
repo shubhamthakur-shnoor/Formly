@@ -192,3 +192,33 @@ export async function getSurveyResponseStats(surveyId) {
     questions,
   };
 }
+
+export async function getSurveyResponsesForExport(surveyId) {
+  const { rows } = await pool.query(
+    `SELECT
+       r.response_id,
+       r.respondent_name,
+       r.respondent_email,
+       q.question_text,
+       COALESCE(
+         a.text_answer,
+         qo.option_text,
+         a.rating_score::text,
+         ''
+       ) AS answer,
+       r.submitted_at
+     FROM responses r
+     LEFT JOIN questions q
+       ON q.survey_id = r.survey_id
+     LEFT JOIN answers a
+       ON a.response_id = r.response_id
+       AND a.question_id = q.question_id
+     LEFT JOIN question_options qo
+       ON qo.option_id = a.selected_option_id
+     WHERE r.survey_id = $1
+     ORDER BY r.response_id, q.question_order`,
+    [surveyId]
+  );
+
+  return rows;
+}

@@ -6,6 +6,7 @@ import questionRoutes from "./routes/question.js";
 import publicSurveyRoutes from "./routes/publicSurvey.js";
 import responseRoutes from "./routes/response.js";
 import responseStatsRoutes from "./routes/responseStats.js";
+import responseExportRoutes from "./routes/responseExport.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/surveys", surveyRoutes);
 app.use("/api", questionRoutes);
 app.use("/api", responseStatsRoutes);
+app.use("/api", responseExportRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
