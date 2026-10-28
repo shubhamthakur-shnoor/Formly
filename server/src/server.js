@@ -1,5 +1,6 @@
 import express from "express";
 import "dotenv/config";
+import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import surveyRoutes from "./routes/survey.js";
 import questionRoutes from "./routes/question.js";
@@ -10,7 +11,11 @@ import responseExportRoutes from "./routes/responseExport.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+  })
+);
 app.use(express.json());
 
 app.get("/", function (req, res) {
