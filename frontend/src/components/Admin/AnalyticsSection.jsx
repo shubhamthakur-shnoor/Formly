@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,Cell } from "recharts";
 import { ChartCard, EmptyState } from "./DashboardUI";
 const COLORS = ["#006c49", "#0fb981", "#8abf9e"];
 const getStatus = (survey) =>
