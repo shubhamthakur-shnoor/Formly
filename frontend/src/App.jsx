@@ -4,6 +4,11 @@ import LandingPage from "./components/Landing/page";
 import SignIn from "./pages/Signin";
 import SignUp from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import CreateSurvey from "./components/Admin/CreateSurvey";
+import EditSurvey from "./components/Admin/EditSurvey";
+import SurveyQuestions from "./components/Admin/SurveyQuestions";
+import PublicSurveys from "./pages/PublicSurveys";
+import ParticipateSurvey from "./pages/ParticipateSurvey";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -26,6 +31,14 @@ function App() {
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route
+          path="/available-surveys"
+          element={<PublicSurveys />}
+        />
+        <Route
+          path="/survey/:slug"
+          element={<ParticipateSurvey />}
+        />
+        <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
@@ -37,7 +50,15 @@ function App() {
           path="/dashboard/surveys/new"
           element={
             <ProtectedRoute>
-              <FeaturePlaceholder title="Create Survey" />
+              <CreateSurvey />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/surveys/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditSurvey />
             </ProtectedRoute>
           }
         />
