@@ -1,15 +1,8 @@
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Menu, Plus, RefreshCw, Search, Users,
-  ClipboardList, CheckCircle2, FileEdit,
-} from "lucide-react";
-import {
-  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
-
+import { createPortal } from "react-dom";
+import { Menu, Copy, ExternalLink, Plus, RefreshCw, Search, Users, ClipboardList, CheckCircle2, FileEdit,MoreVertical,Send, LockKeyhole } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Sidebar from "../components/Admin/Sidebar";
 import api from "../services/api";
 
@@ -18,7 +11,6 @@ const COLORS = ["#006c49", "#0fb981", "#8abf9e"];
 const getSurveys = (data) =>
   Array.isArray(data) ? data :
   data?.surveys ?? data?.data?.surveys ?? data?.data ?? [];
-
 const getStatus = (survey) => (survey.status || "DRAFT").toUpperCase();
 
 const getResponses = (survey) =>
@@ -70,6 +62,12 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const menuButtonRefs = useRef({});
+  const menuRef = useRef(null);
+  const [copiedSurveyId, setCopiedSurveyId] = useState(null);
 
   const [adminName, setAdminName] = useState(
     () => localStorage.getItem("full_name") || "Admin"
@@ -100,6 +98,83 @@ export default function Dashboard() {
     const name = localStorage.getItem("full_name");
     if (name) setAdminName(name);
   }, []);
+
+  const closeActionMenu = useCallback(() => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
+  }, []);
+
+  const toggleActionMenu = (surveyId) => {
+    if (openMenuId === surveyId) {
+      closeActionMenu();
+      return;
+    }
+
+    const button = menuButtonRefs.current[surveyId];
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const menuWidth = 208;
+    const estimatedMenuHeight = 172;
+    const gap = 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp =
+      spaceBelow < estimatedMenuHeight + gap &&
+      rect.top > estimatedMenuHeight + gap;
+
+    setMenuPosition({
+      top: openUp ? rect.top - gap : rect.bottom + gap,
+      left: Math.max(
+        8,
+        Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)
+      ),
+      openUp,
+    });
+    setOpenMenuId(surveyId);
+  };
+
+  const handleStatusChange = async (survey, nextStatus) => {
+    const surveyId = survey.id ?? survey.survey_id;
+    setError("");
+    setUpdatingStatusId(surveyId);
+
+    try {
+      await api.patch(`/surveys/${surveyId}/status`, { status: nextStatus });
+      closeActionMenu();
+      await fetchSurveys();
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Unable to update survey status."
+      );
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (openMenuId == null) return;
+
+    const handleOutsideClick = (event) => {
+      const button = menuButtonRefs.current[openMenuId];
+      if (menuRef.current?.contains(event.target) || button?.contains(event.target)) return;
+      closeActionMenu();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeActionMenu();
+    };
+    const handleViewportChange = () => closeActionMenu();
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [openMenuId, closeActionMenu]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -204,14 +279,126 @@ export default function Dashboard() {
                       : "—"}
                   </td>
                   <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      disabled={id == null}
-                      onClick={() => navigate(`/dashboard/surveys/${id}`)}
-                      className="font-medium text-[#006c49] hover:underline disabled:opacity-40"
-                    >
-                      View
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        ref={(element) => {
+                          if (id != null) menuButtonRefs.current[id] = element;
+                        }}
+                        type="button"
+                        aria-label={`Actions for ${survey.title || "survey"}`}
+                        title="Survey actions"
+                        aria-expanded={openMenuId === id}
+                        onClick={() => toggleActionMenu(id)}
+                        disabled={id == null}
+                        className="rounded-lg p-2 text-[#376850] transition hover:bg-[#e5f5eb] disabled:opacity-40"
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+                    </div>
+
+                    {openMenuId === id && menuPosition && createPortal(
+                      <div
+                        ref={menuRef}
+                        style={{
+                          position: "fixed",
+                          top: menuPosition.top,
+                          left: menuPosition.left,
+                          transform: menuPosition.openUp ? "translateY(-100%)" : "none",
+                          zIndex: 9999,
+                        }}
+                        className="w-52 rounded-xl border border-[#bbcabf] bg-white p-1.5 shadow-xl"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeActionMenu();
+                            navigate(`/dashboard/surveys/${id}/questions`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[#161d19] hover:bg-[#f4fbf4]"
+                        >
+                          <ClipboardList size={16} />
+                          View Questions
+                        </button>
+
+                        {status !== "PUBLISHED" ? (
+                          <button
+                            type="button"
+                            disabled={updatingStatusId === id}
+                            onClick={() => handleStatusChange(survey, "PUBLISHED")}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[#161d19] hover:bg-[#f4fbf4] disabled:opacity-50"
+                          >
+                            <Send size={16} />
+                            {updatingStatusId === id ? "Updating..." : "Publish survey"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={updatingStatusId === id}
+                            onClick={() => handleStatusChange(survey, "CLOSED")}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <LockKeyhole size={16} />
+                            {updatingStatusId === id ? "Updating..." : "Close survey"}
+                          </button>
+                        )}
+                      {status === "PUBLISHED" && survey.slug && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const publicUrl =
+                                  `${window.location.origin}/survey/${encodeURIComponent(survey.slug)}`;
+
+                              try {
+                                await navigator.clipboard.writeText(publicUrl);
+                                setCopiedSurveyId(id);
+                                window.setTimeout(() => {
+                                  setCopiedSurveyId((current) =>
+                                    current === id ? null : current
+                                  );
+                                }, 2000);
+                                closeActionMenu();
+                              } catch {
+                                setError("Unable to copy the link. Please copy it manually.");
+                              }
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-[#f4fbf4]"
+                          >
+                            <Copy size={16} />
+                            {copiedSurveyId === id ? "Link copied!" : "Copy public link"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              closeActionMenu();
+                              window.open(
+                                `${window.location.origin}/survey/${survey.slug}`,
+                                "_blank",
+                                "noopener,noreferrer"
+                              );
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-[#f4fbf4]"
+                          >
+                            <ExternalLink size={16} />
+                            Open public survey
+                          </button>
+                        </>
+                      )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeActionMenu();
+                            navigate(`/dashboard/surveys/${id}/edit`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[#161d19] hover:bg-[#f4fbf4]"
+                        >
+                          <FileEdit size={16} />
+                          Edit Survey
+                        </button>
+                      </div>,
+                      document.body
+                    )}
                   </td>
                 </tr>
               );
