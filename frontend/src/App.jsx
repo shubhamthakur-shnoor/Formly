@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
 import LandingPage from "./components/Landing/page";
 import SignIn from "./pages/Signin";
 import SignUp from "./pages/Signup";
@@ -13,14 +12,6 @@ import ParticipateSurvey from "./pages/ParticipateSurvey";
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/signin" replace />;
-}
-
-function FeaturePlaceholder({ title }) {
-  return (
-    <main className="min-h-screen bg-[#f4fbf4] p-8 text-[#161d19]">
-      <h1 className="font-hanken text-3xl font-bold">{title}</h1>
-    </main>
-  );
 }
 
 function App() {
@@ -63,10 +54,10 @@ function App() {
           }
         />
         <Route
-          path="/dashboard/surveys/:id"
+          path="/dashboard/surveys/:id/questions"
           element={
             <ProtectedRoute>
-              <FeaturePlaceholder title="Survey Details" />
+              <SurveyQuestions />
             </ProtectedRoute>
           }
         />
