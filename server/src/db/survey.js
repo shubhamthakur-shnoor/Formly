@@ -114,3 +114,23 @@ export async function getPublishedSurveyBySlug(slug) {
 
   return rows[0] || null;
 }
+export async function getPublicSurveys() {
+  const { rows } = await pool.query(
+    `SELECT
+       survey_id,
+       title,
+       slug,
+       description,
+       is_anonymous,
+       start_at,
+       end_at,
+       created_at
+     FROM surveys
+     WHERE status = 'PUBLISHED'
+       AND (start_at IS NULL OR start_at <= NOW())
+       AND (end_at IS NULL OR end_at > NOW())
+     ORDER BY created_at DESC`
+  );
+
+  return rows;
+}
