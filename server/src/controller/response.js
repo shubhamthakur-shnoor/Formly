@@ -6,7 +6,7 @@ import {
 } from "../utils/responseValidator.js";
 import { getPublishedSurveyBySlug } from "../db/survey.js";
 import { getPublicQuestionsBySurvey } from "../db/question.js";
-import { createSurveyResponse } from "../db/response.js";
+import { createSurveyResponse , hasExistingEmailResponse} from "../db/response.js";
 
 export async function submitPublicResponse(req, res) {
   try {
@@ -63,7 +63,20 @@ export async function submitPublicResponse(req, res) {
     const respondentToken = survey.is_anonymous
       ? data.respondent_token
       : null;
+      // Check duplicate email for identified survey
+      if (!survey.is_anonymous && respondentEmail) {
+        const alreadySubmitted = await hasExistingEmailResponse(
+          survey.survey_id,
+          respondentEmail
+        );
 
+        if (alreadySubmitted) {
+          return res.status(409).json({
+            message: "You have already submitted a response to this survey.",
+            code: "DUPLICATE_RESPONSE",
+          });
+        }
+      }
     // Save response and answers.
     const response = await createSurveyResponse(
       survey.survey_id,

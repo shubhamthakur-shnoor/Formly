@@ -222,3 +222,16 @@ export async function getSurveyResponsesForExport(surveyId) {
 
   return rows;
 }
+
+export async function hasExistingEmailResponse(surveyId, email) {
+  const { rows } = await pool.query(
+    `SELECT 1
+     FROM responses
+     WHERE survey_id = $1
+       AND LOWER(TRIM(respondent_email)) = LOWER(TRIM($2))
+     LIMIT 1`,
+    [surveyId, email]
+  );
+
+  return rows.length > 0;
+}
