@@ -1,21 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
 import LandingPage from "./components/Landing/page";
 import SignIn from "./pages/Signin";
 import SignUp from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import CreateSurvey from "./components/Admin/CreateSurvey";
+import EditSurvey from "./components/Admin/EditSurvey";
+import SurveyQuestions from "./components/Admin/SurveyQuestions";
+import PublicSurveys from "./pages/PublicSurveys";
+import ParticipateSurvey from "./pages/ParticipateSurvey";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/signin" replace />;
-}
-
-function FeaturePlaceholder({ title }) {
-  return (
-    <main className="min-h-screen bg-[#f4fbf4] p-8 text-[#161d19]">
-      <h1 className="font-hanken text-3xl font-bold">{title}</h1>
-    </main>
-  );
 }
 
 function App() {
@@ -25,6 +21,14 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route
+          path="/available-surveys"
+          element={<PublicSurveys />}
+        />
+        <Route
+          path="/survey/:slug"
+          element={<ParticipateSurvey />}
+        />
         <Route
           path="/dashboard"
           element={
@@ -37,15 +41,23 @@ function App() {
           path="/dashboard/surveys/new"
           element={
             <ProtectedRoute>
-              <FeaturePlaceholder title="Create Survey" />
+              <CreateSurvey />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/dashboard/surveys/:id"
+          path="/dashboard/surveys/:id/edit"
           element={
             <ProtectedRoute>
-              <FeaturePlaceholder title="Survey Details" />
+              <EditSurvey />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/surveys/:id/questions"
+          element={
+            <ProtectedRoute>
+              <SurveyQuestions />
             </ProtectedRoute>
           }
         />

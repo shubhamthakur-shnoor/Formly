@@ -1,5 +1,5 @@
 import {ArrowDown, ArrowRight, BarChart3, CheckCircle2, ChevronRight, ClipboardCheck, Download, FileText, Link2, MessageSquareText, ShieldCheck, Sparkles} from "lucide-react";
-
+import { Link } from "react-router-dom";
 const features = [
   {
     icon: FileText,
@@ -105,12 +105,12 @@ function LandingPage() {
             >
               How it works
             </a>
-            <a
-              href="/surveys"
+            <Link
+              to="/available-surveys"
               className="text-sm font-medium text-ink-muted transition-colors hover:text-primary"
             >
               Available Surveys
-            </a>
+            </Link>
             <span className="h-5 w-px bg-border" />
             <a
               href="/signin"

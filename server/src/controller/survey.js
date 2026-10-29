@@ -1,4 +1,4 @@
-import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey, updateSurveyStatus} from "../db/survey.js";
+import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey, updateSurveyStatus,getPublicSurveys} from "../db/survey.js";
 import { generateSlug } from "../utils/slug.js";
 import { surveyStatusSchema } from "../utils/validator.js";
 
@@ -166,5 +166,16 @@ export async function changeSurveyStatus(req, res) {
 
     console.error("Change survey status error:", error.message);
     return res.status(500).json({ message: "Internal server error" });
+  }
+}
+export async function listPublicSurveys(req, res) { // fetch all the surveys
+  try {
+    const surveys = await getPublicSurveys();
+    return res.json({ surveys });
+  } catch (error) {
+    console.error("List public surveys error:", error.message);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
