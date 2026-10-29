@@ -42,12 +42,14 @@ export default function SignIn() {
 
       const user = data?.user || data?.data?.user;
       const fullName = user?.full_name || user?.name;
+      const userEmail = user?.email || email.trim().toLowerCase();
 
       localStorage.setItem("token", token);
 
       if (fullName) {
         localStorage.setItem("full_name", fullName);
       }
+      localStorage.setItem("email", userEmail);
 
       navigate("/dashboard", { replace: true });
     } catch (err) {
