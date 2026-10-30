@@ -91,13 +91,16 @@ export async function submitPublicResponse(req, res) {
       response,
     });
   } catch (error) {
-    if (error.code === "23505") {
+    if (
+      error.code === "23505" &&
+      error.constraint === "unique_survey_respondent_token"
+    ) {
       return res.status(409).json({
-        message: "You have already submitted a response to this survey",
+        message: "You have already submitted a response to this survey.",
+        code: "DUPLICATE_RESPONSE",
       });
     }
-
-    console.error("Submit response error:", error.message);
+    console.error("Submit response error:", error);
 
     return res.status(500).json({
       message: "Internal server error",
