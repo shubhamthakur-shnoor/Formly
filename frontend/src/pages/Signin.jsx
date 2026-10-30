@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -10,6 +9,7 @@ import {
   Mail,
 } from "lucide-react";
 import api from "../services/api";
+import Loader from "../components/Common/Loader";
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ export default function SignIn() {
     event.preventDefault();
     setError("");
     setLoading(true);
+    const startTime = Date.now();
 
     try {
       const { data } = await api.post("/auth/login", {
@@ -37,6 +38,7 @@ export default function SignIn() {
 
       if (!token) {
         setError("Unable to sign in. Please check the server response.");
+        setLoading(false);
         return;
       }
 
@@ -50,6 +52,10 @@ export default function SignIn() {
         localStorage.setItem("full_name", fullName);
       }
       localStorage.setItem("email", userEmail);
+      // load atleast 1.5 seconds
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, 1500 - elapsedTime);
+      await new Promise((resolve) => setTimeout(resolve, remainingTime));
 
       navigate("/dashboard", { replace: true });
     } catch (err) {
@@ -60,13 +66,14 @@ export default function SignIn() {
             ? `Login failed (${err.response.status}). Please check your credentials.`
             : "Unable to connect to the server. Please try again.")
       );
-    } finally {
       setLoading(false);
     }
   }
 
   const successMessage = location.state?.message;
-
+  if (loading) {
+    return <Loader message="Signing you in..." />;
+  }
   return (
     <main className="min-h-screen bg-[#f4fbf4] px-5 py-8 text-[#161d19]">
       <header className="mx-auto flex max-w-6xl items-center justify-between">
