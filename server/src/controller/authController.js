@@ -2,7 +2,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { registerSchema, loginSchema } from "../utils/validator.js";
-import { findUserByEmail, updateUserProfile, getUserPasswordHashById, updateUserPassword } from "../db/authDB.js";
+import { findUserByEmail, createUser, updateUserProfile, getUserPasswordHashById, updateUserPassword } from "../db/authDB.js";
 
 const generateToken = (userId) =>
   jwt.sign({ userId }, process.env.JWT_SECRET, {
