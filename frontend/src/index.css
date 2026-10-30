@@ -75,3 +75,33 @@ a {
 .font-jetbrains {
   font-family: "JetBrains Mono", monospace;
 }
+
+@keyframes formly-loading {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+.formly-loading-bar {
+  animation: formly-loading 1.2s ease-in-out infinite;
+}
+
+@keyframes formly-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: formly-fade-in 0.5s ease-out both;
+}

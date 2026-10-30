@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, LogOut, X } from "lucide-react";
 
 import api from "../services/api";
+import Skeleton from "../components/Common/Skeleton";
 
 import Sidebar from "../components/Admin/Sidebar";
 import DashboardHeader from "../components/Admin/DashboardHeader";
@@ -101,13 +102,19 @@ export default function Dashboard() {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const [showPageSkeleton, setShowPageSkeleton] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notice, setNotice] = useState("");
 
   const adminName =
     localStorage.getItem("full_name") || "Admin";
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowPageSkeleton(false);
+    },300);
 
+    return () => window.clearTimeout(timer);
+  }, [activePage]);
 const fetchSurveys = useCallback(async () => {
   try {
     setLoading(true);
@@ -190,10 +197,13 @@ const fetchSurveys = useCallback(async () => {
   }, [notice]);
 
   const handleNavigate = (page) => {
-    setActivePage(page);
-    setMobileOpen(false);
-    setNotice("");
-  };
+  if (page === activePage) return;
+
+  setShowPageSkeleton(true);
+  setActivePage(page);
+  setMobileOpen(false);
+  setNotice("");
+};
 
   const handleStatusChange = async (survey, nextStatus) => {
     const surveyId = survey.id ?? survey.survey_id;
@@ -253,7 +263,7 @@ const fetchSurveys = useCallback(async () => {
     localStorage.removeItem("full_name");
     localStorage.removeItem("email");
 
-    navigate("/signin", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const renderActivePage = () => {
@@ -290,7 +300,7 @@ const fetchSurveys = useCallback(async () => {
             loading={loading}
             error={error}
             adminName={adminName}
-            onViewAll={() => setActivePage("My Surveys")}
+            onViewAll={() => handleNavigate("My Surveys")}
           />
         );
     }
@@ -333,7 +343,11 @@ const fetchSurveys = useCallback(async () => {
             </div>
           )}
 
-          {renderActivePage()}
+          {showPageSkeleton ? (
+            <Skeleton />
+          ) : (
+            renderActivePage()
+          )}
         </main>
       </div>
 

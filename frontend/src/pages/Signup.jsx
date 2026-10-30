@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -11,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import api from "../services/api";
+import Loader from "../components/Common/Loader";
 
 function SignUp() {
   const navigate = useNavigate();
@@ -47,6 +47,7 @@ function SignUp() {
     }
 
     setLoading(true);
+    const startTime = Date.now();
 
     try {
       const response = await api.post("/auth/register", {
@@ -61,14 +62,29 @@ function SignUp() {
         response.data?.data?.token;
 
       if (!token) {
-        console.error("Signup response:", response.data);
         setError(
           "Account created, but automatic login is unavailable. Please sign in."
         );
         return;
       }
+      const user = response.data?.user || response.data?.data?.user;
 
       localStorage.setItem("token", token);
+      localStorage.setItem(
+        "full_name",
+        user?.full_name || trimmedName
+      );
+      localStorage.setItem(
+        "email",
+        user?.email || trimmedEmail.toLowerCase()
+      );
+      // 1.5 seconds loadz
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, 1500 - elapsedTime);
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, remainingTime)
+      );
 
       navigate("/dashboard", { replace: true });
     } catch (error) {
@@ -87,6 +103,9 @@ function SignUp() {
     } finally {
       setLoading(false);
     }
+  }
+  if (loading) {
+    return <Loader message="Creating your Formly account..." />;
   }
 
   return (
