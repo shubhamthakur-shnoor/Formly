@@ -14,6 +14,18 @@ export default function ParticipateSurvey() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [respondentToken] = useState(() => {
+    const storageKey = `formly_respondent_${slug}`;
+
+    let token = localStorage.getItem(storageKey);
+
+    if (!token) {
+      token = crypto.randomUUID();
+      localStorage.setItem(storageKey, token);
+    }
+
+    return token;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -113,13 +125,19 @@ export default function ParticipateSurvey() {
     try {
       setSubmitting(true);
 
+      const submissionData = {
+        ...(survey.is_anonymous
+          ? { respondent_token: respondentToken }
+          : {
+              respondent_name: name.trim(),
+              respondent_email: email.trim(),
+            }),
+        answers: formattedAnswers,
+      };
+
       await api.post(
         `/public/surveys/${encodeURIComponent(slug)}/responses`,
-        {
-          respondent_name: survey.is_anonymous ? null : name.trim(),
-          respondent_email: survey.is_anonymous ? null : email.trim(),
-          answers: formattedAnswers,
-        }
+        submissionData
       );
 
       setSuccess(true);
