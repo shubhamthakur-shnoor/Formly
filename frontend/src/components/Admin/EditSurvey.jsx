@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Eye } from "lucide-react";
 import api from "../../services/api";
 
 const initialForm = {
   title: "",
   description: "",
   is_anonymous: true,
+  visible_to_end_users: false,
   start_at: "",
   end_at: "",
 };
@@ -52,10 +53,16 @@ export default function EditSurvey() {
         }
 
         if (!cancelled) {
+          const visibleToEndUsers =
+            survey.visible_to_end_users ?? false;
           setForm({
             title: survey.title ?? "",
             description: survey.description ?? "",
-            is_anonymous: survey.is_anonymous ?? true,
+            // Visible to End Users always means non-anonymous
+            is_anonymous: visibleToEndUsers
+              ? false
+              : survey.is_anonymous ?? true,
+            visible_to_end_users: visibleToEndUsers,
             start_at: toLocalDateTime(survey.start_at),
             end_at: toLocalDateTime(survey.end_at),
           });
@@ -69,7 +76,9 @@ export default function EditSurvey() {
           );
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -83,10 +92,17 @@ export default function EditSurvey() {
   function handleChange(event) {
     const { name, value, checked, type } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setForm((current) => {
+      const updated = {
+        ...current,
+        [name]: type === "checkbox" ? checked : value,
+      };
+      // Visible ON => login required and non-anonymous
+      if (name === "visible_to_end_users" && checked) {
+        updated.is_anonymous = false;
+      }
+      return updated;
+    });
 
     setError("");
   }
@@ -114,7 +130,12 @@ export default function EditSurvey() {
     const payload = {
       title,
       description: form.description.trim(),
-      is_anonymous: form.is_anonymous,
+      is_anonymous: form.visible_to_end_users
+        ? false
+        : form.is_anonymous,
+      // Automatically controlled by Visible to End Users
+      login_required: form.visible_to_end_users,
+      visible_to_end_users: form.visible_to_end_users,
       start_at: form.start_at
         ? new Date(form.start_at).toISOString()
         : null,
@@ -130,7 +151,9 @@ export default function EditSurvey() {
 
       navigate("/dashboard", {
         replace: true,
-        state: { message: "Survey updated successfully." },
+        state: {
+          message: "Survey updated successfully.",
+        },
       });
     } catch (err) {
       setError(
@@ -172,6 +195,7 @@ export default function EditSurvey() {
             </h1>
           </div>
 
+          {/* Basic Details */}
           <div className="mt-5">
             <label htmlFor="title" className="text-sm font-medium">
               Title <span className="text-red-600">*</span>
@@ -203,6 +227,7 @@ export default function EditSurvey() {
             />
           </div>
 
+          {/* Schedule */}
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="start_at" className="text-sm font-medium">
@@ -234,16 +259,57 @@ export default function EditSurvey() {
             </div>
           </div>
 
-          <label className="mt-5 flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-            <input
-              type="checkbox"
-              name="is_anonymous"
-              checked={form.is_anonymous}
-              onChange={handleChange}
-              className="size-4 accent-[#006c49]"
-            />
-            Anonymous responses
-          </label>
+          {/* Response Preferences */}
+          {!form.visible_to_end_users && (
+            <div className="mt-6 space-y-3">
+              <h3 className="text-sm font-bold text-[#17251c]">
+                Response Preferences
+              </h3>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#bbcabf] p-4">
+                <input
+                  type="checkbox"
+                  name="is_anonymous"
+                  checked={form.is_anonymous}
+                  onChange={handleChange}
+                  className="mt-1 size-4 accent-[#006c49]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold">
+                    Anonymous responses
+                  </span>
+                  <span className="mt-1 block text-sm text-[#3c4a42]">
+                    Keep respondent identity hidden in survey responses.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
+          {/* Access Settings */}
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-bold text-[#17251c]">
+              Survey Access
+            </h3>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#bbcabf] p-4 transition hover:border-[#006c49]/50">
+              <input
+                type="checkbox"
+                name="visible_to_end_users"
+                checked={form.visible_to_end_users}
+                onChange={handleChange}
+                className="mt-1 size-4 accent-[#006c49]"
+              />
+              <span>
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Eye size={16} className="text-[#006c49]" />
+                  Visible to End Users
+                </span>
+                <span className="mt-1 block text-sm text-[#3c4a42]">
+                  Show this survey in the End User Dashboard. Only signed-in
+                  respondents can participate, and their identity will be
+                  recorded automatically.
+                </span>
+              </span>
+            </label>
+          </div>
 
           {error && (
             <p
