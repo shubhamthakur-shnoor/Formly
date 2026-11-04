@@ -1,10 +1,33 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useLocation, Link, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, LoaderCircle, Send } from "lucide-react";
 import api from "../services/api";
 
 export default function ParticipateSurvey() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Only surveys opened from the End User Dashboard return to the dashboard.
+  // Public survey links keep their existing public navigation flow.
+  const isEndUserFlow = location.state?.source === "end-user";
+  const returnTo = isEndUserFlow
+    ? location.state?.returnTo || "/dashboard"
+    : "/available-surveys";
+  const returnPage = isEndUserFlow
+    ? location.state?.returnPage || "Available Surveys"
+    : null;
+
+  const navigateBack = () => {
+    if (isEndUserFlow) {
+      navigate(returnTo, {
+        replace: true,
+        state: { activePage: returnPage },
+      });
+      return;
+    }
+
+    navigate("/available-surveys", { replace: true });
+  };
   const [survey, setSurvey] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [name, setName] = useState("");
@@ -14,6 +37,11 @@ export default function ParticipateSurvey() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+
+  const requiresVerifiedIdentity = Boolean(survey?.visible_to_end_users);
+
   const [respondentToken] = useState(() => {
     const storageKey = `formly_respondent_${slug}`;
 
@@ -59,6 +87,72 @@ export default function ParticipateSurvey() {
       cancelled = true;
     };
   }, [slug]);
+  useEffect(() => {
+  if (!survey) return;
+
+  const token = localStorage.getItem("token");
+  const userType = localStorage.getItem("user_type");
+
+  // Only surveys that require a verified End User account should redirect
+  // unauthenticated users to sign in. Public surveys remain accessible.
+  if (requiresVerifiedIdentity && (!token || userType !== "RESPONDENT")) {
+    navigate("/signin", {
+      replace: true,
+      state: {
+        from: location.pathname,
+        source: location.state?.source,
+        returnTo: location.state?.returnTo,
+        returnPage: location.state?.returnPage,
+        message: "Please sign in as a respondent to participate.",
+      },
+    });
+    return;
+  }
+
+  // Fetch profile for authenticated respondents
+  if (token && userType === "RESPONDENT" && !survey.is_anonymous) {
+    let cancelled = false;
+
+    async function fetchRespondentProfile() {
+      try {
+        setProfileLoading(true);
+        setProfileError("");
+
+        const { data } = await api.get("/auth/profile");
+        const profile = data?.user ?? data?.data?.user;
+
+        if (!profile) {
+          throw new Error("Unable to load your respondent profile.");
+        }
+
+        if (!cancelled) {
+          setName(profile.full_name ?? "");
+          setEmail(profile.email ?? "");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setProfileError(
+            err.response?.data?.message ||
+              "Unable to fetch your profile. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    }
+
+    fetchRespondentProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }
+}, [
+  survey,
+  requiresVerifiedIdentity,
+  navigate,
+  location.pathname,
+]);
 
   function updateAnswer(questionId, value) {
     setAnswers((previous) => ({
@@ -87,8 +181,12 @@ export default function ParticipateSurvey() {
 
     if (!survey) return;
 
-    if (!survey.is_anonymous && (!name.trim() || !email.trim())) {
+    if ( !survey.is_anonymous && !requiresVerifiedIdentity && (!name.trim() || !email.trim())) {
       setError("Please enter your name and email address.");
+      return;
+    }
+    if (requiresVerifiedIdentity && (!name.trim() || !email.trim())) {
+      setError("Unable to verify your account details. Please try again.");
       return;
     }
     for (const question of questions) {
@@ -125,13 +223,18 @@ export default function ParticipateSurvey() {
     try {
       setSubmitting(true);
 
-      const submissionData = {
-        ...(survey.is_anonymous
-          ? { respondent_token: respondentToken }
-          : {
-              respondent_name: name.trim(),
-              respondent_email: email.trim(),
-            }),
+      const submissionData = requiresVerifiedIdentity
+  ? {
+      answers: formattedAnswers,
+    }
+  : survey.is_anonymous
+    ? {
+        respondent_token: respondentToken,
+        answers: formattedAnswers,
+      }
+    : {
+        respondent_name: name.trim(),
+        respondent_email: email.trim(),
         answers: formattedAnswers,
       };
 
@@ -172,13 +275,14 @@ export default function ParticipateSurvey() {
           <p className="mt-2 text-sm leading-6 text-gray-500">
             {error || "This survey may no longer be available."}
           </p>
-          <Link
-            to="/available-surveys"
+          <button
+            type="button"
+            onClick={navigateBack}
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#176b4b] px-5 py-3 text-sm font-semibold text-white hover:bg-[#10583d]"
           >
             <ArrowLeft size={16} />
             Browse surveys
-          </Link>
+          </button>
         </div>
       </main>
     );
@@ -198,13 +302,14 @@ export default function ParticipateSurvey() {
             Your response has been submitted. We appreciate you taking the
             time to share your feedback.
           </p>
-          <Link
-            to="/available-surveys"
+          <button
+            type="button"
+            onClick={navigateBack}
             className="mt-7 inline-flex items-center gap-2 rounded-lg bg-[#176b4b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#10583d]"
           >
-            Explore more surveys
+            {isEndUserFlow ? "Back to Available Surveys" : "Explore more surveys"}
             <ArrowRight size={16} />
-          </Link>
+          </button>
         </div>
       </main>
     );
@@ -221,14 +326,15 @@ export default function ParticipateSurvey() {
             Formly<span className="text-[#34a875]">.</span>
           </Link>
 
-          <Link
-            to="/available-surveys"
+          <button
+            type="button"
+            onClick={navigateBack}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
           >
             <ArrowLeft size={16} />
             <span className="hidden sm:inline">All surveys</span>
             <span className="sm:hidden">Back</span>
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -277,19 +383,68 @@ export default function ParticipateSurvey() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {!survey.is_anonymous && (
-            <section className="rounded-2xl border border-[#e0e7e1] bg-white p-6 shadow-sm sm:p-8">
-              <div className="mb-6">
+          <section className="rounded-2xl border border-[#e0e7e1] bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#23815a]">
                   About you
                 </p>
+
                 <h2 className="mt-2 text-xl font-bold text-gray-900">
                   Your details
                 </h2>
+
                 <p className="mt-1 text-sm leading-6 text-gray-500">
-                  Please enter your details before answering.
+                  {requiresVerifiedIdentity
+                    ? "Your identity is verified using your respondent account."
+                    : "Please enter your details before answering."}
                 </p>
               </div>
 
+              {!requiresVerifiedIdentity &&
+                localStorage.getItem("user_type") !== "RESPONDENT" && (
+                  <Link
+                    to="/signin"
+                    state={{ from: location.pathname }}
+                    className="shrink-0 text-sm font-semibold text-[#176b4b] hover:underline"
+                  >
+                    Sign in
+                  </Link>
+                )}
+            </div>
+
+            {requiresVerifiedIdentity ? (
+              <div className="rounded-xl border border-[#dce8de] bg-[#f5f8f5] p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-[#176b4b]" />
+                  <span className="text-sm font-semibold text-[#176b4b]">
+                    Signed in as
+                  </span>
+                </div>
+
+                {profileLoading ? (
+                  <p className="text-sm text-gray-500">
+                    Loading your profile...
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Full name</p>
+                      <p className="mt-1 font-semibold text-gray-900">
+                        {name}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">Email address</p>
+                      <p className="mt-1 font-semibold text-gray-900">
+                        {email}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label
@@ -298,6 +453,7 @@ export default function ParticipateSurvey() {
                   >
                     Full name <span className="text-red-600">*</span>
                   </label>
+
                   <input
                     id="respondent-name"
                     name="name"
@@ -306,7 +462,7 @@ export default function ParticipateSurvey() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Your full name"
-                    className="w-full rounded-xl border border-gray-200 bg-[#fcfdfc] px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-[#269467] focus:ring-4 focus:ring-[#269467]/10"
+                    className="w-full rounded-xl border border-gray-200 bg-[#fcfdfc] px-4 py-3 text-sm outline-none focus:border-[#269467] focus:ring-4 focus:ring-[#269467]/10"
                   />
                 </div>
 
@@ -317,6 +473,7 @@ export default function ParticipateSurvey() {
                   >
                     Email address <span className="text-red-600">*</span>
                   </label>
+
                   <input
                     id="respondent-email"
                     name="email"
@@ -326,12 +483,19 @@ export default function ParticipateSurvey() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="you@example.com"
-                    className="w-full rounded-xl border border-gray-200 bg-[#fcfdfc] px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-[#269467] focus:ring-4 focus:ring-[#269467]/10"
+                    className="w-full rounded-xl border border-gray-200 bg-[#fcfdfc] px-4 py-3 text-sm outline-none focus:border-[#269467] focus:ring-4 focus:ring-[#269467]/10"
                   />
                 </div>
               </div>
-            </section>
-          )}
+            )}
+
+            {profileError && (
+              <p className="mt-3 text-sm text-red-600">
+                {profileError}
+              </p>
+            )}
+          </section>
+        )}
 
           {questions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#cbd9ce] bg-white px-6 py-14 text-center">

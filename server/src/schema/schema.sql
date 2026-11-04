@@ -11,12 +11,14 @@ CREATE TABLE users (
 CREATE TABLE surveys (
     survey_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    title VARCHAR(200) NOT NULL UNIQUE,
+    title VARCHAR(200) NOT NULL,
     slug VARCHAR(220) NOT NULL UNIQUE,
     description TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'PUBLISHED', 'CLOSED')),
     is_anonymous BOOLEAN NOT NULL DEFAULT TRUE,
+    login_required BOOLEAN NOT NULL DEFAULT FALSE,
+    visible_to_end_users BOOLEAN NOT NULL DEFAULT FALSE,
     start_at TIMESTAMPTZ,
     end_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -51,6 +53,7 @@ CREATE TABLE question_options (
 CREATE TABLE responses (
     response_id BIGSERIAL PRIMARY KEY,
     survey_id BIGINT NOT NULL REFERENCES surveys(survey_id) ON DELETE CASCADE,
+    respondent_id BIGINT REFERENCES respondents(respondent_id) ON DELETE SET NULL,
     respondent_name VARCHAR(100),
     respondent_email VARCHAR(255),
     respondent_token TEXT,
@@ -66,4 +69,14 @@ CREATE TABLE answers (
     selected_option_id BIGINT REFERENCES question_options(option_id),
     rating_score INTEGER CHECK (rating_score BETWEEN 1 AND 5),
     UNIQUE (response_id, question_id)
+);
+
+-- Respondent (END USER)
+CREATE TABLE respondents (
+    respondent_id BIGSERIAL PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

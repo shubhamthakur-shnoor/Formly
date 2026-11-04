@@ -1,13 +1,14 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Eye } from "lucide-react";
 import api from "../../services/api";
 
 const initialForm = {
   title: "",
   description: "",
   is_anonymous: true,
+  visible_to_end_users: false,
   start_at: "",
   end_at: "",
 };
@@ -17,6 +18,7 @@ const inputClass =
 
 export default function SurveyForm() {
   const navigate = useNavigate();
+
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,10 +26,20 @@ export default function SurveyForm() {
   function handleChange(event) {
     const { name, value, checked, type } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setForm((current) => {
+      const updated = {
+        ...current,
+        [name]: type === "checkbox" ? checked : value,
+      };
+
+      // Visible to End Users ON means login is required
+      // and anonymous responses are disabled.
+      if (name === "visible_to_end_users" && checked) {
+        updated.is_anonymous = false;
+      }
+
+      return updated;
+    });
 
     setError("");
   }
@@ -55,10 +67,19 @@ export default function SurveyForm() {
     const payload = {
       title,
       description: form.description.trim(),
-      is_anonymous: form.is_anonymous,
+
+      is_anonymous: form.visible_to_end_users
+        ? false
+        : form.is_anonymous,
+
+      // Automatically controlled by Visible to End Users
+      login_required: form.visible_to_end_users,
+      visible_to_end_users: form.visible_to_end_users,
+
       start_at: form.start_at
         ? new Date(form.start_at).toISOString()
         : null,
+
       end_at: form.end_at
         ? new Date(form.end_at).toISOString()
         : null,
@@ -78,7 +99,7 @@ export default function SurveyForm() {
         replace: true,
         state: {
           message: data.message || "Survey created successfully.",
-          surveyId: data.survey.id,
+          surveyId: data.survey.survey_id ?? data.survey.id,
         },
       });
     } catch (err) {
@@ -110,13 +131,16 @@ export default function SurveyForm() {
       </button>
 
       <div className="border-b border-[#e4ece5] pb-5">
-        <h2 className="font-hanken text-2xl font-bold">Survey details</h2>
+        <h2 className="font-hanken text-2xl font-bold">
+          Survey details
+        </h2>
         <p className="mt-2 text-sm text-[#3c4a42]">
           Enter the basic information and configure your response preferences.
         </p>
       </div>
 
       <div className="mt-6 space-y-5">
+        {/* Basic Details */}
         <div>
           <label htmlFor="title" className="text-sm font-semibold">
             Survey title *
@@ -148,6 +172,7 @@ export default function SurveyForm() {
           />
         </div>
 
+        {/* Schedule */}
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label htmlFor="start_at" className="text-sm font-semibold">
@@ -179,23 +204,63 @@ export default function SurveyForm() {
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#bbcabf] p-4">
-          <input
-            type="checkbox"
-            name="is_anonymous"
-            checked={form.is_anonymous}
-            onChange={handleChange}
-            className="mt-1 accent-[#006c49]"
-          />
-          <span>
-            <span className="block text-sm font-semibold">
-              Anonymous responses
+        {/* Response Preferences */}
+        {!form.visible_to_end_users && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-[#17251c]">
+              Response Preferences
+            </h3>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#bbcabf] p-4 transition hover:border-[#006c49]/50">
+              <input
+                type="checkbox"
+                name="is_anonymous"
+                checked={form.is_anonymous}
+                onChange={handleChange}
+                className="mt-1 size-4 accent-[#006c49]"
+              />
+
+              <span>
+                <span className="block text-sm font-semibold">
+                  Anonymous responses
+                </span>
+                <span className="mt-1 block text-sm text-[#3c4a42]">
+                  Keep respondent identity hidden in survey responses.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Access Settings */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-[#17251c]">
+            Survey Access
+          </h3>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#bbcabf] p-4 transition hover:border-[#006c49]/50">
+            <input
+              type="checkbox"
+              name="visible_to_end_users"
+              checked={form.visible_to_end_users}
+              onChange={handleChange}
+              className="mt-1 size-4 accent-[#006c49]"
+            />
+
+            <span className="flex-1">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Eye size={16} className="text-[#006c49]" />
+                Visible to End Users
+              </span>
+
+              <span className="mt-1 block text-sm text-[#3c4a42]">
+                Show this survey in the End User Dashboard. Only signed-in
+                respondents can participate, and their identity will be
+                recorded automatically.
+              </span>
             </span>
-            <span className="mt-1 block text-sm text-[#3c4a42]">
-              Allow respondents to submit feedback anonymously.
-            </span>
-          </span>
-        </label>
+          </label>
+        </div>
       </div>
 
       {error && (

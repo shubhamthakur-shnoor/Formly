@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AlertTriangle, LogOut, X } from "lucide-react";
-
+import { Navigate, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Skeleton from "../components/Common/Skeleton";
-
+import { AlertTriangle, X, LogOut } from "lucide-react";
 import Sidebar from "../components/Admin/Sidebar";
 import DashboardHeader from "../components/Admin/DashboardHeader";
 import DashboardOverview from "../components/Admin/DashboardOverview";
@@ -13,6 +11,7 @@ import AnalyticsSection from "../components/Admin/AnalyticsSection";
 import ResponsesSection from "../components/Admin/ResponsesSection";
 import ExportsSection from "../components/Admin/ExportsSection";
 import SettingsSection from "../components/Admin/SettingsSection";
+import EndUserDashboard from "../components/EndUser/EndUserDashboard";
 
 const PAGE_TITLES = {
   Overview: "Overview",
@@ -93,7 +92,7 @@ function LogoutConfirmModal({ onCancel, onConfirm }) {
   );
 }
 
-export default function Dashboard() {
+function AdminDashboard() {
   const navigate = useNavigate();
 
   const [activePage, setActivePage] = useState("Overview");
@@ -256,15 +255,14 @@ const fetchSurveys = useCallback(async () => {
     window.open(publicUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handleLogout = () => {
-    setShowLogoutConfirm(false);
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user_type");
+  localStorage.removeItem("full_name");
+  localStorage.removeItem("email");
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("full_name");
-    localStorage.removeItem("email");
-
-    navigate("/", { replace: true });
-  };
+  window.location.href = "/";
+};
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -359,4 +357,18 @@ const fetchSurveys = useCallback(async () => {
       )}
     </div>
   );
+}
+export default function Dashboard() {
+  const token = localStorage.getItem("token");
+  const userType = localStorage.getItem("user_type");
+
+  if (!token || !["ADMIN", "RESPONDENT"].includes(userType)) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  if (userType === "RESPONDENT") {
+    return <EndUserDashboard />;
+  }
+
+  return <AdminDashboard />;
 }

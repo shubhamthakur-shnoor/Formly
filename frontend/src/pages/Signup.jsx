@@ -23,90 +23,110 @@ function SignUp() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [accountType, setAccountType] = useState("ADMIN");
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError("");
 
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
+async function handleSubmit(event) {
+  event.preventDefault();
+  setError("");
 
-    if (trimmedName.length < 2) {
-      setError("Please enter your full name.");
-      return;
-    }
+  const trimmedName = name.trim();
+  const trimmedEmail = email.trim().toLowerCase();
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
-      return;
-    }
+  if (trimmedName.length < 2) {
+    setError("Please enter your full name.");
+    return;
+  }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+  if (password.length < 8) {
+    setError("Password must be at least 8 characters long.");
+    return;
+  }
 
-    setLoading(true);
-    const startTime = Date.now();
+  if (password !== confirmPassword) {
+    setError("Passwords do not match.");
+    return;
+  }
 
-    try {
-      const response = await api.post("/auth/register", {
-        full_name: trimmedName,
-        email: trimmedEmail,
-        password,
-      });
+  setLoading(true);
+  const startTime = Date.now();
 
-      const token =
-        response.data?.token ||
-        response.data?.accessToken ||
-        response.data?.data?.token;
+  try {
+    const endpoint =
+      accountType === "ADMIN"
+        ? "/auth/register"
+        : "/auth/respondent/register";
 
-      if (!token) {
-        setError(
-          "Account created, but automatic login is unavailable. Please sign in."
-        );
-        return;
-      }
-      const user = response.data?.user || response.data?.data?.user;
+    const response = await api.post(endpoint, {
+      full_name: trimmedName,
+      email: trimmedEmail,
+      password,
+    });
 
-      localStorage.setItem("token", token);
-      localStorage.setItem(
-        "full_name",
-        user?.full_name || trimmedName
-      );
-      localStorage.setItem(
-        "email",
-        user?.email || trimmedEmail.toLowerCase()
-      );
-      // 1.5 seconds loadz
-      const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, 1500 - elapsedTime);
+    const data = response.data;
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, remainingTime)
-      );
+    const token =
+      data?.token ||
+      data?.accessToken ||
+      data?.data?.token;
 
-      navigate("/dashboard", { replace: true });
-    } catch (error) {
-      console.error(
-        "Signup error:",
-        error.response?.data || error.message
-      );
+    const user = data?.user || data?.data?.user;
 
+    if (!token) {
       setError(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          (error.response
-            ? `Registration failed (${error.response.status}). Please check your details.`
-            : "Unable to connect to the server. Please check whether the backend is running.")
+        "Account created, but automatic login is unavailable. Please sign in."
       );
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const userType = user?.user_type || accountType;
+
+    if (!["ADMIN", "RESPONDENT"].includes(userType)) {
+      setError("Invalid account type received. Please sign in.");
+      return;
+    }
+
+    // Save authentication details before navigation.
+    localStorage.setItem("token", token);
+    localStorage.setItem("user_type", userType);
+    localStorage.setItem(
+      "full_name",
+      user?.full_name || trimmedName
+    );
+    localStorage.setItem(
+      "email",
+      user?.email || trimmedEmail
+    );
+
+    // Keep existing signup loading experience.
+    const elapsedTime = Date.now() - startTime;
+    const remainingTime = Math.max(0, 1500 - elapsedTime);
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, remainingTime)
+    );
+
+    // Both Admin and End User use the same dashboard route.
+    navigate("/dashboard", { replace: true });
+
+  } catch (error) {
+    console.error(
+      "Signup error:",
+      error.response?.data || error.message
+    );
+
+    setError(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        (error.response
+          ? `Registration failed (${error.response.status}). Please check your details.`
+          : "Unable to connect to the server. Please check whether the backend is running.")
+    );
+  } finally {
+    setLoading(false);
   }
-  if (loading) {
-    return <Loader message="Creating your Formly account..." />;
-  }
+}
+
 
   return (
     <main className="min-h-screen bg-[#f4fbf4] px-5 py-8 text-[#161d19]">
@@ -142,6 +162,72 @@ function SignUp() {
         </div>
 
         <div className="rounded-2xl border border-[#bbcabf] bg-white p-6 shadow-[0_12px_40px_rgba(22,29,25,0.04)] sm:p-8">
+          <div className="mb-7">
+  <p className="mb-4 text-center text-sm font-semibold text-[#3c4a42]">
+    Choose account type
+  </p>
+
+  <div className="flex items-center justify-center gap-4 sm:gap-5">
+    <button
+      type="button"
+      onClick={() => {
+        setAccountType("ADMIN");
+        setError("");
+      }}
+      className={`text-sm font-semibold transition-colors sm:text-base ${
+        accountType === "ADMIN"
+          ? "text-[#161d19]"
+          : "text-[#8a9890]"
+      }`}
+    >
+      Admin
+    </button>
+
+    {/* Sliding Toggle */}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={accountType === "RESPONDENT"}
+      aria-label="Switch between Admin and End User"
+      onClick={() => {
+        setAccountType((current) =>
+          current === "ADMIN" ? "RESPONDENT" : "ADMIN"
+        );
+        setError("");
+      }}
+      className="relative flex h-7 w-15 shrink-0 items-center rounded-full bg-[#dfe7df] p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-[#006c49]/30"
+>
+  <span
+    className={`absolute left-1 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-[#10b981] shadow-sm transition-transform duration-300 ease-in-out ${
+      accountType === "RESPONDENT"
+        ? "translate-x-7"
+        : "translate-x-0"
+    }`}
+  />
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        setAccountType("RESPONDENT");
+        setError("");
+      }}
+      className={`whitespace-nowrap text-sm font-semibold transition-colors sm:text-base ${
+        accountType === "RESPONDENT"
+          ? "text-[#161d19]"
+          : "text-[#8a9890]"
+      }`}
+    >
+      End User
+    </button>
+  </div>
+
+  <p className="mt-3 text-center text-xs text-[#68776e]">
+    {accountType === "ADMIN"
+      ? "Create and manage your surveys."
+      : "Participate in surveys and track your submissions."}
+  </p>
+</div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
@@ -297,8 +383,8 @@ function SignUp() {
               disabled={loading}
               className="primary-button w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Creating account..." : "Create account"}
-              {!loading && <ArrowRight size={17} />}
+              {loading ? "Creating account..."
+                : `Create ${accountType === "ADMIN" ? "Admin" : "End User"} account`}
             </button>
 
             <p className="pt-1 text-center text-xs leading-5 text-[#3c4a42]">
