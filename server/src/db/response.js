@@ -1,33 +1,41 @@
 import { pool } from "../config/db.js";
+
 export async function createSurveyResponse(
   surveyId,
+  respondentId,
   respondentName,
   respondentEmail,
   respondentToken,
   answers
 ) {
   const client = await pool.connect();
+
   try {
     await client.query("BEGIN");
-    // Save the response and its unique submission token.
+
+    // Save response and respondent account reference.
     const { rows } = await client.query(
       `INSERT INTO responses (
         survey_id,
+        respondent_id,
         respondent_name,
         respondent_email,
         respondent_token
       )
-      VALUES ($1, $2, $3, $4)
-      RETURNING response_id, survey_id, submitted_at`,
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING response_id, survey_id, respondent_id, submitted_at`,
       [
         surveyId,
+        respondentId ?? null,
         respondentName,
         respondentEmail,
         respondentToken ?? null,
       ]
     );
+
     const response = rows[0];
-    // Save all answers under the newly created response.
+
+    // Save answers under the newly created response.
     for (const answer of answers) {
       await client.query(
         `INSERT INTO answers (
@@ -47,6 +55,7 @@ export async function createSurveyResponse(
         ]
       );
     }
+
     await client.query("COMMIT");
 
     return response;
@@ -57,6 +66,7 @@ export async function createSurveyResponse(
     client.release();
   }
 }
+
 
 export async function getSurveyResponseStats(surveyId) {
   // Total responses.
@@ -234,4 +244,83 @@ export async function hasExistingEmailResponse(surveyId, email) {
   );
 
   return rows.length > 0;
+}
+
+export async function getRespondentSubmissions(respondentId) {
+  const { rows } = await pool.query(
+    `SELECT
+       r.response_id,
+       r.survey_id,
+       s.title AS survey_title,
+       s.slug AS survey_slug,
+       r.submitted_at
+     FROM responses r
+     JOIN surveys s
+       ON s.survey_id = r.survey_id
+     WHERE r.respondent_id = $1
+     ORDER BY r.submitted_at DESC`,
+    [respondentId]
+  );
+
+  return rows;
+}
+
+export async function getRespondentSubmissionDetail(
+  responseId,
+  respondentId
+) {
+  const { rows } = await pool.query(
+    `SELECT
+       r.response_id,
+       r.survey_id,
+       r.submitted_at,
+       s.title AS survey_title,
+       q.question_id,
+       q.question_text,
+       q.question_type,
+       q.question_order,
+       a.text_answer,
+       a.rating_score,
+       a.selected_option_id,
+       qo.option_text AS selected_option_text
+     FROM responses r
+     JOIN surveys s
+       ON s.survey_id = r.survey_id
+     LEFT JOIN questions q
+       ON q.survey_id = r.survey_id
+     LEFT JOIN answers a
+       ON a.response_id = r.response_id
+       AND a.question_id = q.question_id
+     LEFT JOIN question_options qo
+       ON qo.option_id = a.selected_option_id
+     WHERE r.response_id = $1
+       AND r.respondent_id = $2
+     ORDER BY q.question_order ASC`,
+    [responseId, respondentId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const firstRow = rows[0];
+
+  return {
+    response_id: firstRow.response_id,
+    survey_id: firstRow.survey_id,
+    survey_title: firstRow.survey_title,
+    submitted_at: firstRow.submitted_at,
+    questions: rows
+      .filter((row) => row.question_id !== null)
+      .map((row) => ({
+        question_id: row.question_id,
+        question_text: row.question_text,
+        question_type: row.question_type,
+        question_order: row.question_order,
+        text_answer: row.text_answer,
+        rating_score: row.rating_score,
+        selected_option_id: row.selected_option_id,
+        selected_option_text: row.selected_option_text,
+      })),
+  };
 }

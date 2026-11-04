@@ -2,7 +2,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { registerSchema, loginSchema } from "../utils/validator.js";
-import { findUserByEmail, createUser, updateUserProfile, getUserPasswordHashById, updateUserPassword, findRespondentByEmail, createRespondent, getRespondentPasswordHashById, updateRespondentPassword, updateRespondentProfile } from "../db/authDB.js";
+import { findUserByEmail, createUser, updateUserProfile, getUserPasswordHashById, updateUserPassword, findRespondentByEmail, createRespondent, getRespondentPasswordHashById, updateRespondentPassword, updateRespondentProfile, findUserById, findRespondentById } from "../db/authDB.js";
 
 const generateToken = (userId) =>
   jwt.sign(

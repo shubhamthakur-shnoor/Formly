@@ -1,4 +1,4 @@
-import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey, updateSurveyStatus,getPublicSurveys} from "../db/survey.js";
+import { createSurvey, getSurveysByUser, getSurveyById, updateSurvey, deleteSurvey, updateSurveyStatus, getPublicSurveys } from "../db/survey.js";
 import { generateSlug } from "../utils/slug.js";
 import { surveyStatusSchema } from "../utils/validator.js";
 
@@ -7,12 +7,24 @@ export async function createSurveyController(req, res) {
     title,
     description,
     is_anonymous = true,
+    visible_to_end_users = false,
     start_at,
     end_at,
   } = req.body;
 
   if (!title?.trim()) {
-    return res.status(400).json({ message: "Survey title is required" });
+    return res.status(400).json({
+      message: "Survey title is required",
+    });
+  }
+
+  if (
+    typeof is_anonymous !== "boolean" ||
+    typeof visible_to_end_users !== "boolean"
+  ) {
+    return res.status(400).json({
+      message: "Survey settings must be boolean values",
+    });
   }
 
   if (start_at && end_at && new Date(end_at) <= new Date(start_at)) {
@@ -22,16 +34,26 @@ export async function createSurveyController(req, res) {
   }
 
   try {
-    const slug = generateSlug(title);
+    const slug = await generateSlug(title);
+
+    // Visible to End Users automatically requires login
+    const loginRequired = visible_to_end_users;
+
+    // Login-required visible surveys cannot be anonymous
+    const isAnonymous = visible_to_end_users
+      ? false
+      : is_anonymous;
 
     const survey = await createSurvey(
       req.user.userId,
       title.trim(),
       slug,
       description,
-      is_anonymous,
+      isAnonymous,
       start_at,
-      end_at
+      end_at,
+      loginRequired,
+      visible_to_end_users
     );
 
     return res.status(201).json({
@@ -41,12 +63,15 @@ export async function createSurveyController(req, res) {
   } catch (error) {
     if (error.code === "23505") {
       return res.status(409).json({
-        message: "Survey title or slug already exists",
+        message: "Survey slug already exists",
       });
     }
 
     console.error("Create survey error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 
@@ -56,7 +81,10 @@ export async function listSurveys(req, res) {
     return res.json({ surveys });
   } catch (error) {
     console.error("List surveys error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 
@@ -68,13 +96,18 @@ export async function getSurvey(req, res) {
     );
 
     if (!survey) {
-      return res.status(404).json({ message: "Survey not found" });
+      return res.status(404).json({
+        message: "Survey not found",
+      });
     }
 
     return res.json({ survey });
   } catch (error) {
     console.error("Get survey error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 
@@ -83,12 +116,26 @@ export async function editSurvey(req, res) {
     title,
     description,
     is_anonymous,
+    visible_to_end_users,
     start_at,
     end_at,
   } = req.body;
 
   if (!title?.trim()) {
-    return res.status(400).json({ message: "Survey title is required" });
+    return res.status(400).json({
+      message: "Survey title is required",
+    });
+  }
+
+  if (
+    (is_anonymous !== undefined &&
+      typeof is_anonymous !== "boolean") ||
+    (visible_to_end_users !== undefined &&
+      typeof visible_to_end_users !== "boolean")
+  ) {
+    return res.status(400).json({
+      message: "Survey settings must be boolean values",
+    });
   }
 
   if (start_at && end_at && new Date(end_at) <= new Date(start_at)) {
@@ -98,46 +145,83 @@ export async function editSurvey(req, res) {
   }
 
   try {
+    const existingSurvey = await getSurveyById(
+      req.params.id,
+      req.user.userId
+    );
+
+    if (!existingSurvey) {
+      return res.status(404).json({
+        message: "Survey not found",
+      });
+    }
+
+    // Preserve existing value if not provided
+    const visibleToEndUsers =
+      visible_to_end_users ?? existingSurvey.visible_to_end_users;
+
+    // Automatically derive login requirement
+    const loginRequired = visibleToEndUsers;
+
+    // Force non-anonymous when visible to end users
+    const isAnonymous = visibleToEndUsers
+      ? false
+      : is_anonymous ?? existingSurvey.is_anonymous;
+
     const survey = await updateSurvey(
       req.params.id,
       req.user.userId,
       title.trim(),
-      generateSlug(title),
+      await generateSlug(title, req.params.id),
       description,
-      is_anonymous,
+      isAnonymous,
       start_at,
-      end_at
+      end_at,
+      loginRequired,
+      visibleToEndUsers
     );
 
-    if (!survey) {
-      return res.status(404).json({ message: "Survey not found" });
-    }
-
-    return res.json({ message: "Survey updated successfully", survey });
+    return res.json({
+      message: "Survey updated successfully",
+      survey,
+    });
   } catch (error) {
     if (error.code === "23505") {
       return res.status(409).json({
-        message: "Survey title or slug already exists",
+        message: "Survey slug already exists",
       });
     }
 
     console.error("Update survey error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 
 export async function removeSurvey(req, res) {
   try {
-    const survey = await deleteSurvey(req.params.id, req.user.userId);
+    const survey = await deleteSurvey(
+      req.params.id,
+      req.user.userId
+    );
 
     if (!survey) {
-      return res.status(404).json({ message: "Survey not found" });
+      return res.status(404).json({
+        message: "Survey not found",
+      });
     }
 
-    return res.json({ message: "Survey deleted successfully" });
+    return res.json({
+      message: "Survey deleted successfully",
+    });
   } catch (error) {
     console.error("Delete survey error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 
@@ -152,7 +236,9 @@ export async function changeSurveyStatus(req, res) {
     );
 
     if (!survey) {
-      return res.status(404).json({ message: "Survey not found" });
+      return res.status(404).json({
+        message: "Survey not found",
+      });
     }
 
     return res.json({
@@ -161,11 +247,15 @@ export async function changeSurveyStatus(req, res) {
     });
   } catch (error) {
     if (error.name === "ZodError") {
-      return res.status(400).json({ errors: error.issues });
+      return res.status(400).json({
+        errors: error.issues,
+      });
     }
 
     console.error("Change survey status error:", error.message);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 }
 export async function listPublicSurveys(req, res) { // fetch all the surveys

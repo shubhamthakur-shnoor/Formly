@@ -8,6 +8,7 @@ import publicSurveyRoutes from "./routes/publicSurvey.js";
 import responseRoutes from "./routes/response.js";
 import responseStatsRoutes from "./routes/responseStats.js";
 import responseExportRoutes from "./routes/responseExport.js";
+import respondentSurveyRoutes from "./routes/respondentSurvey.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,7 @@ app.get("/", function (req, res) {
 app.use("/api/public/surveys", responseRoutes);
 app.use("/api/public/surveys", publicSurveyRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/respondent/surveys", respondentSurveyRoutes);
 app.use("/api/surveys", surveyRoutes);
 app.use("/api", questionRoutes);
 app.use("/api", responseStatsRoutes);

@@ -27,37 +27,60 @@ export default function SignIn() {
     setLoading(true);
     const startTime = Date.now();
 
-    try {
-      const { data } = await api.post("/auth/login", {
-        email: email.trim(),
-        password,
-      });
+    try { 
+    const { data } = await api.post("/auth/login", {
+      email: email.trim(),
+      password,
+    });
 
-      const token =
-        data?.token || data?.accessToken || data?.data?.token;
+    const token =
+      data?.token || data?.accessToken || data?.data?.token;
 
-      if (!token) {
-        setError("Unable to sign in. Please check the server response.");
-        setLoading(false);
-        return;
-      }
+    const user = data?.user || data?.data?.user;
 
-      const user = data?.user || data?.data?.user;
-      const fullName = user?.full_name || user?.name;
-      const userEmail = user?.email || email.trim().toLowerCase();
+    if (!token || !user?.user_type) {
+  setError("Unable to identify your account. Please try again.");
+  setLoading(false);
+  return;
+}
 
-      localStorage.setItem("token", token);
+    const userType = user.user_type;
 
-      if (fullName) {
-        localStorage.setItem("full_name", fullName);
-      }
-      localStorage.setItem("email", userEmail);
-      // load atleast 1.5 seconds
-      const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, 1500 - elapsedTime);
-      await new Promise((resolve) => setTimeout(resolve, remainingTime));
+    if (!["ADMIN", "RESPONDENT"].includes(userType)) {
+  setError("Invalid account type.");
+  setLoading(false);
+  return;
+}
 
-      navigate("/dashboard", { replace: true });
+    const fullName = user.full_name || user.name;
+    const userEmail = user.email || email.trim().toLowerCase();
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user_type", userType);
+    localStorage.setItem("email", userEmail);
+
+    if (fullName) {
+      localStorage.setItem("full_name", fullName);
+    }
+    // Minimum loading time: 1.5 seconds
+    const elapsedTime = Date.now() - startTime;
+    const remainingTime = Math.max(0, 1500 - elapsedTime);
+
+    await new Promise((resolve) => setTimeout(resolve, remainingTime));
+
+const redirectTo = location.state?.from;
+
+const safeRedirect =
+  typeof redirectTo === "string" &&
+  redirectTo.startsWith("/") &&
+  !redirectTo.startsWith("//") &&
+  !redirectTo.startsWith("/signin")
+    ? redirectTo
+    : "/dashboard";
+
+navigate(safeRedirect, {
+  replace: true,
+});
     } catch (err) {
       setError(
         err.response?.data?.message ||
