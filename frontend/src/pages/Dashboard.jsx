@@ -107,79 +107,104 @@ function AdminDashboard() {
 
   const adminName =
     localStorage.getItem("full_name") || "Admin";
+  // Get page-specific skeleton according to active Admin page.
+  const getSkeletonType = () => {
+    switch (activePage) {
+      case "My Surveys":
+        return "admin-surveys";
+
+      case "Analytics":
+        return "admin-analytics";
+
+      case "Responses":
+        return "admin-responses";
+
+      case "Exports":
+        return "admin-exports";
+
+      case "Settings":
+        return "admin-settings";
+
+      case "Overview":
+      default:
+        return "admin";
+    }
+  };
+
+  // Hide page transition skeleton.
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setShowPageSkeleton(false);
-    },300);
+    }, 300);
 
     return () => window.clearTimeout(timer);
   }, [activePage]);
-const fetchSurveys = useCallback(async () => {
-  try {
-    setLoading(true);
-    setError("");
+  // Fetch surveys and their actual response counts.
+  const fetchSurveys = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    const response = await api.get("/surveys");
-    const result = response.data;
+      const response = await api.get("/surveys");
+      const result = response.data;
 
-    const surveyList = Array.isArray(result)
-      ? result
-      : Array.isArray(result?.surveys)
-        ? result.surveys
-        : Array.isArray(result?.data?.surveys)
-          ? result.data.surveys
-          : Array.isArray(result?.data)
-            ? result.data
-            : [];
+      const surveyList = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.surveys)
+          ? result.surveys
+          : Array.isArray(result?.data?.surveys)
+            ? result.data.surveys
+            : Array.isArray(result?.data)
+              ? result.data
+              : [];
 
-    // Fetch the real response count for each survey.
-    const surveysWithCounts = await Promise.all(
-      surveyList.map(async (survey) => {
-        const surveyId = survey.id ?? survey.survey_id;
+      const surveysWithCounts = await Promise.all(
+        surveyList.map(async (survey) => {
+          const surveyId = survey.id ?? survey.survey_id;
 
-        if (!surveyId) return survey;
+          if (!surveyId) return survey;
 
-        try {
-          const statsResponse = await api.get(
-            `/surveys/${surveyId}/statistics`
-          );
+          try {
+            const statsResponse = await api.get(
+              `/surveys/${surveyId}/statistics`
+            );
 
-          const statsResult = statsResponse.data;
+            const statsResult = statsResponse.data;
 
-          const stats =
-            statsResult?.data?.statistics ??
-            statsResult?.data ??
-            statsResult?.statistics ??
-            statsResult;
+            const stats =
+              statsResult?.data?.statistics ??
+              statsResult?.data ??
+              statsResult?.statistics ??
+              statsResult;
 
-          const actualCount = Number(
-            stats?.total_responses ??
-              stats?.totalResponses ??
-              0
-          );
+            const actualCount = Number(
+              stats?.total_responses ??
+                stats?.totalResponses ??
+                0
+            );
 
-          return {
-            ...survey,
-            response_count: actualCount,
-            total_responses: actualCount,
-          };
-        } catch {
-          // Keep the count already provided by the surveys endpoint.
-          return survey;
-        }
-      })
-    );
+            return {
+              ...survey,
+              response_count: actualCount,
+              total_responses: actualCount,
+            };
+          } catch {
+            // Keep the count already provided by the surveys endpoint.
+            return survey;
+          }
+        })
+      );
 
-    setSurveys(surveysWithCounts);
-  } catch (err) {
-    setError(
-      err.response?.data?.message ||
-        "Unable to load surveys. Please try again."
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
+      setSurveys(surveysWithCounts);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Unable to load surveys. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchSurveys();
@@ -195,14 +220,15 @@ const fetchSurveys = useCallback(async () => {
     return () => window.clearTimeout(timeoutId);
   }, [notice]);
 
+  // Sidebar navigation.
   const handleNavigate = (page) => {
-  if (page === activePage) return;
+    if (page === activePage) return;
 
-  setShowPageSkeleton(true);
-  setActivePage(page);
-  setMobileOpen(false);
-  setNotice("");
-};
+    setShowPageSkeleton(true);
+    setActivePage(page);
+    setMobileOpen(false);
+    setNotice("");
+  };
 
   const handleStatusChange = async (survey, nextStatus) => {
     const surveyId = survey.id ?? survey.survey_id;
@@ -243,6 +269,7 @@ const fetchSurveys = useCallback(async () => {
     }
   };
 
+  // Open survey in a new tab.
   const handleOpenSurvey = (survey) => {
     if (!survey.slug) {
       setNotice("This survey does not have a public link yet.");
@@ -255,14 +282,15 @@ const fetchSurveys = useCallback(async () => {
     window.open(publicUrl, "_blank", "noopener,noreferrer");
   };
 
-const handleLogout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user_type");
-  localStorage.removeItem("full_name");
-  localStorage.removeItem("email");
+  // Logout.
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user_type");
+    localStorage.removeItem("full_name");
+    localStorage.removeItem("email");
 
-  window.location.href = "/";
-};
+    window.location.href = "/";
+  };
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -341,8 +369,9 @@ const handleLogout = () => {
             </div>
           )}
 
+          {/* Page-specific Admin skeleton */}
           {showPageSkeleton ? (
-            <Skeleton />
+            <Skeleton type={getSkeletonType()} />
           ) : (
             renderActivePage()
           )}
